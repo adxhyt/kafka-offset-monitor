@@ -1,0 +1,15 @@
+{
+    "url": "http://localhost:8555/stat/worker",
+    "zookeepers": [
+        "127.0.0.1:2181/kafka/cart"
+    ],
+    "zk_path": "/kafka/cart",
+    "zk_cluster": "cart",
+    "interval": 60,
+    "distance_threshold": 2000,
+    "pass_by": [
+            {"cluster":"cart", "consumer_group":"3ea39300b500528bf516957747ba9853", "topic":"cart_op"},
+            {"cluster":"cart", "consumer_group":"d852d778ec3037471bbae9835047ec5f", "topic":"cart_operation"},
+            {"cluster":"cart", "consumer_group":"192ac44e573c74f62807e9beecbc7454", "topic":"doota_order_add"}
+    ]
+}
