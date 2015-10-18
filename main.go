@@ -158,7 +158,7 @@ func run(config *Config, zookeeper string) (data []LogData) {
 	for cg, cgData := range pusherDataMap {
 		cgItem := map[string]int64{}
 		for topic, topicData := range cgData {
-			for partId, offset := range topicData {
+			for _, offset := range topicData {
 				cgItem[topic] += offset
 			}
 		}
