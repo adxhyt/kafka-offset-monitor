@@ -26,20 +26,12 @@ type ClientResp struct {
 	Partition int32
 	Offset    int64
 	Url       string
-	UUID      string
-	Name      string
 }
 
 type RetMsg struct {
 	Data   []*ClientResp
 	Errmsg string
 	Errno  int
-}
-
-type Topic struct {
-	TopicName     string
-	ConsumerGroup string
-	PartitionData map[int32]int64
 }
 
 type LogData struct {
@@ -99,7 +91,9 @@ func run(config *Config, zookeeper string) (data []LogData) {
 	}
 	host, err := os.Hostname()
 
+	topicKeyList := []string{}
 	for topicKey, v := range kafkaOffset {
+		topicKeyList = append(topicKeyList, topicKey)
 		data = append(data, LogData{
 			Host:          host,
 			Zabbix_key:    ZABBIX_KEY_LASTEST_OFFSET,
@@ -117,47 +111,73 @@ func run(config *Config, zookeeper string) (data []LogData) {
 		return nil
 	}
 
-	topicList := make(map[string]Topic)
-	topicItem := map[int32]int64{}
-	for _, v := range msg.Data {
-		topicItem[v.Partition] = v.Offset
-		topic := Topic{v.Topic, v.getGroupName(), topicItem}
-		topicList[v.Topic] = topic
-	}
-
-	// compute each topic total_distance
-	topicDistance := map[string]int64{}
-	for topicKey, value := range topicList {
-		for partitionKey, offset := range value.PartitionData {
-			topicDistance[topicKey] += kafkaOffset[topicKey][fmt.Sprintf("%d", partitionKey)] - offset
-		}
-	}
-
-	rtn := map[string]map[string]string{}
+	// pass_by
+	passBy := map[string]map[string]string{}
 	for _, value := range config.Passby {
 		item := map[string]string{}
 		item[value.ConsumerGroup] = value.Topic
-		rtn[value.Cluster] = item
+		passBy[value.Cluster] = item
 	}
 
-	// record distance for each topic
-	for topicKey, d := range topicDistance {
+	newResp := []ClientResp{}
+	for _, v := range msg.Data {
 		// pass_by filter
-		temp, ok := rtn[config.ZkCluster][topicList[topicKey].ConsumerGroup]
-		if ok && temp == topicList[topicKey].TopicName {
+		temp, ok := passBy[config.ZkCluster][v.getGroupName()]
+		if ok && temp == v.Topic {
 			continue
 		}
-		data = append(data, LogData{
-			Host:          host,
-			Zabbix_key:    ZABBIX_KEY_DISTANCE,
-			Cluster:       config.ZkCluster,
-			ConsumerGroup: topicList[topicKey].ConsumerGroup,
-			Topic:         topicList[topicKey].TopicName,
-			Threshold:     config.Distance,
-			Distance:      d,
-		})
+		value, ok := kafkaOffset[v.Topic][fmt.Sprintf("%d", v.Partition)]
+		if ok {
+			v.Offset = value - v.Offset
+			newResp = append(newResp, ClientResp{
+				Topic:     v.Topic,
+				Partition: v.Partition,
+				Offset:    v.Offset, // already distance
+				Url:       v.getGroupName(),
+			})
+		}
 	}
 
+	//change []slice => map
+	pusherDataMap := map[string]map[string]map[int32]int64{}
+	for _, group := range newResp {
+		g, ok := pusherDataMap[group.Url]
+		if !ok {
+			g = make(map[string]map[int32]int64)
+			pusherDataMap[group.Url] = g
+		}
+		t, ok := g[group.Topic]
+		if !ok {
+			t = make(map[int32]int64)
+			g[group.Topic] = t
+		}
+		t[group.Partition] = group.Offset
+	}
+
+	distanceData := map[string]map[string]int64{}
+	for cg, cgData := range pusherDataMap {
+		cgItem := map[string]int64{}
+		for topic, topicData := range cgData {
+			for partId, offset := range topicData {
+				cgItem[topic] += offset
+			}
+		}
+		distanceData[cg] = cgItem
+	}
+
+	for cg, cgData := range distanceData {
+		for topic, distance := range cgData {
+			data = append(data, LogData{
+				Host:          host,
+				Zabbix_key:    ZABBIX_KEY_DISTANCE,
+				Cluster:       config.ZkCluster,
+				ConsumerGroup: cg,
+				Topic:         topic,
+				Threshold:     config.Distance,
+				Distance:      distance,
+			})
+		}
+	}
 	return data
 }
 
