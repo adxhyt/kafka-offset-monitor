@@ -30,12 +30,12 @@ func (this *FileWriter) WriteToFile() error {
 	} else {
 		fileHandle, err = os.Create(this.Path)
 	}
-	check(err)
+	Check(err)
 
 	defer fileHandle.Close()
 
 	for _, content := range this.Contents {
-		s := fmt.Sprintf("%s kafka_monitor[%s,%s,%s,%s,%d] %d \n", content.Host, content.Zabbix_key, content.Cluster, content.ConsumerGroup, content.Topic, content.Threshold, content.Distance)
+		s := fmt.Sprintf("%s kafka_monitor[%s,%s,%s,%s,%s,%d] %d \n", content.Host, content.Zabbix_key, content.Cluster, content.ConsumerGroup, content.Url, content.Topic, content.Threshold, content.Distance)
 		if _, err := io.WriteString(fileHandle, s); err != nil {
 			return err
 		}
@@ -43,7 +43,7 @@ func (this *FileWriter) WriteToFile() error {
 	return nil
 }
 
-func check(e error) {
+func Check(e error) {
 	if e != nil {
 		panic(e)
 	}

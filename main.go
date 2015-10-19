@@ -15,10 +15,10 @@ import (
 )
 
 var (
-	configFile, filename      string
-	ZABBIX_KEY_LASTEST_OFFSET = "latest_offset"
-	ZABBIX_KEY_DISTANCE       = "distance"
-	INT64_MAX                 = 9223372036854775807
+	configFile, filename, logger_file string
+	ZABBIX_KEY_LASTEST_OFFSET         = "latest_offset"
+	ZABBIX_KEY_DISTANCE               = "distance"
+	INT64_MAX                         = 9223372036854775807
 )
 
 type ClientResp struct {
@@ -39,6 +39,7 @@ type LogData struct {
 	Zabbix_key    string
 	Cluster       string
 	ConsumerGroup string
+	Url           string
 	Topic         string
 	Threshold     int
 	Distance      int64
@@ -47,6 +48,7 @@ type LogData struct {
 func init() {
 	flag.StringVar(&configFile, "c", "config.json", "the config file")
 	flag.StringVar(&filename, "f", "/home/work/kafka-monitor/log/kafka_offset_monitor", "the log path")
+	flag.StringVar(&logger_file, "l", "/home/work/kafka-monitor/log/kafka_offset_logger", "the runtime logger path")
 }
 
 func main() {
@@ -99,6 +101,7 @@ func run(config *Config, zookeeper string) (data []LogData) {
 			Zabbix_key:    ZABBIX_KEY_LASTEST_OFFSET,
 			Cluster:       config.ZkCluster,
 			ConsumerGroup: "na",
+			Url:           "na",
 			Topic:         topicKey,
 			Threshold:     INT64_MAX,
 			Distance:      v["total"],
@@ -133,10 +136,18 @@ func run(config *Config, zookeeper string) (data []LogData) {
 				Topic:     v.Topic,
 				Partition: v.Partition,
 				Offset:    v.Offset, // already distance
-				Url:       v.getGroupName(),
+				Url:       v.Url,
 			})
 		}
 	}
+
+	msgLog := []string{}
+	for _, v := range newResp {
+		s := fmt.Sprintf("[Distance Data] topic:%s cg:%s url:%s partition:%d distance:%d", v.Topic, getGroupNameByUrl(v.Url), v.Url, v.Partition, v.Offset)
+		msgLog = append(msgLog, s)
+	}
+	logger := NewFileLogger(logger_file, msgLog)
+	logger.RecordLogger()
 
 	//change []slice => map
 	pusherDataMap := map[string]map[string]map[int32]int64{}
@@ -171,7 +182,8 @@ func run(config *Config, zookeeper string) (data []LogData) {
 				Host:          host,
 				Zabbix_key:    ZABBIX_KEY_DISTANCE,
 				Cluster:       config.ZkCluster,
-				ConsumerGroup: cg,
+				ConsumerGroup: getGroupNameByUrl(cg),
+				Url:           cg,
 				Topic:         topic,
 				Threshold:     config.Distance,
 				Distance:      distance,
@@ -194,6 +206,13 @@ func RemoteGet(url string) (msg *RetMsg, err error) {
 	}
 
 	err = json.Unmarshal([]byte(body), &msg)
+
+	//msgLog := []string{}
+	//s := fmt.Sprintf("[Pusher Data] %s", string(body))
+	//msgLog = append(msgLog, s)
+	//logger := NewFileLogger(logger_file, msgLog)
+	//logger.RecordLogger()
+
 	if err != nil {
 		return nil, err
 	}
@@ -203,6 +222,13 @@ func RemoteGet(url string) (msg *RetMsg, err error) {
 func (this *ClientResp) getGroupName() string {
 	m := md5.New()
 	m.Write([]byte(this.Url))
+	s := hex.EncodeToString(m.Sum(nil))
+	return s
+}
+
+func getGroupNameByUrl(url string) string {
+	m := md5.New()
+	m.Write([]byte(url))
 	s := hex.EncodeToString(m.Sum(nil))
 	return s
 }
