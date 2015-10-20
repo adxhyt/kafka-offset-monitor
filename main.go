@@ -207,12 +207,6 @@ func RemoteGet(url string) (msg *RetMsg, err error) {
 
 	err = json.Unmarshal([]byte(body), &msg)
 
-	//msgLog := []string{}
-	//s := fmt.Sprintf("[Pusher Data] %s", string(body))
-	//msgLog = append(msgLog, s)
-	//logger := NewFileLogger(logger_file, msgLog)
-	//logger.RecordLogger()
-
 	if err != nil {
 		return nil, err
 	}
