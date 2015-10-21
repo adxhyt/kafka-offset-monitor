@@ -6,6 +6,7 @@
     "zk_path": "/kafka/cart",
     "zk_cluster": "cart",
     "interval": 60,
+    "sleep": 20,
     "distance_threshold": 2000,
     "pass_by": [
             {"cluster":"cart", "consumer_group":"3ea39300b500528bf516957747ba9853", "topic":"cart_op"},
