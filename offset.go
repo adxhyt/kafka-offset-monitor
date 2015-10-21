@@ -12,7 +12,7 @@ type OffsetWorker struct {
 }
 
 func NewOffsetWorker(zookeeper string, cluster string) *OffsetWorker {
-	return &OffsetWorker{zookeeper, cluster}
+	return &OffsetWorker{zookeeper: zookeeper, cluster: cluster}
 }
 
 func (this *OffsetWorker) GetLastOffset() (map[string]map[string]int64, error) {
@@ -35,6 +35,8 @@ func (this *OffsetWorker) GetLastOffset() (map[string]map[string]int64, error) {
 	if nil != err {
 		return nil, err
 	}
+	defer kafkaClient.Close()
+	defer kazooClient.Close()
 
 	rtn := map[string]map[string]int64{}
 
