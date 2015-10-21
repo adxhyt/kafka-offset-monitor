@@ -7,8 +7,10 @@ import (
 )
 
 type OffsetWorker struct {
-	zookeeper string
-	cluster   string
+	kazooClient *kazoo.Kazoo
+	kafkaClient sarama.Client
+	zookeeper   string
+	cluster     string
 }
 
 func NewOffsetWorker(zookeeper string, cluster string) *OffsetWorker {
@@ -35,8 +37,9 @@ func (this *OffsetWorker) GetLastOffset() (map[string]map[string]int64, error) {
 	if nil != err {
 		return nil, err
 	}
-	defer kafkaClient.Close()
-	defer kazooClient.Close()
+
+	this.kafkaClient = kafkaClient
+	this.kazooClient = kazooClient
 
 	rtn := map[string]map[string]int64{}
 
@@ -65,5 +68,11 @@ func (this *OffsetWorker) GetLastOffset() (map[string]map[string]int64, error) {
 		item["total"] = offset_total
 		rtn[topic] = item
 	}
+
 	return rtn, nil
+}
+
+func (this *OffsetWorker) Close() {
+	this.kafkaClient.Close()
+	this.kazooClient.Close()
 }

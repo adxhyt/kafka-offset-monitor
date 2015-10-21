@@ -90,6 +90,8 @@ func run(config *Config, zookeeper string) (data []LogData) {
 	if nil != err {
 		return nil
 	}
+	defer worker.Close()
+
 	host, err := os.Hostname()
 
 	topicKeyList := []string{}
