@@ -16,6 +16,7 @@ import (
 
 var (
 	configFile, filename, logger_file string
+	logger_switch                     int
 	ZABBIX_KEY_LASTEST_OFFSET         = "latest_offset"
 	ZABBIX_KEY_DISTANCE               = "distance"
 	INT64_MAX                         = 9223372036854775807
@@ -49,6 +50,7 @@ func init() {
 	flag.StringVar(&configFile, "c", "config.json", "the config file")
 	flag.StringVar(&filename, "f", "/home/work/kafka-monitor/log/kafka_offset_monitor", "the log path")
 	flag.StringVar(&logger_file, "l", "/home/work/kafka-monitor/log/kafka_offset_logger", "the runtime logger path")
+	flag.IntVar(&logger_switch, "sw", 0, "the logger switcher")
 }
 
 func main() {
@@ -61,13 +63,12 @@ func main() {
 	}
 
 	t := time.NewTicker(time.Duration(config.Interval) * time.Second)
-
 	for {
 		select {
 		case <-t.C:
 
 			go func() {
-				r := rand.Intn(config.Interval)
+				r := rand.Intn(config.Sleep)
 				time.Sleep(time.Duration(r))
 
 				var logContents []LogData
@@ -75,11 +76,9 @@ func main() {
 					data := run(config, zookeeper)
 					logContents = append(logContents, data...)
 				}
-
 				writer := NewFileWriter(filename, logContents)
 				writer.WriteToFile()
 			}()
-
 		}
 	}
 }
@@ -141,14 +140,15 @@ func run(config *Config, zookeeper string) (data []LogData) {
 		}
 	}
 
-	msgLog := []string{}
-	for _, v := range newResp {
-		s := fmt.Sprintf("[Distance Data] topic:%s cg:%s url:%s partition:%d distance:%d", v.Topic, getGroupNameByUrl(v.Url), v.Url, v.Partition, v.Offset)
-		msgLog = append(msgLog, s)
+	if logger_switch == 1 {
+		msgLog := []string{}
+		for _, v := range newResp {
+			s := fmt.Sprintf("[Distance Data] topic:%s cg:%s url:%s partition:%d distance:%d", v.Topic, getGroupNameByUrl(v.Url), v.Url, v.Partition, v.Offset)
+			msgLog = append(msgLog, s)
+		}
+		logger := NewFileLogger(logger_file, msgLog)
+		logger.RecordLogger()
 	}
-	logger := NewFileLogger(logger_file, msgLog)
-	logger.RecordLogger()
-
 	//change []slice => map
 	pusherDataMap := map[string]map[string]map[int32]int64{}
 	for _, group := range newResp {
@@ -206,7 +206,6 @@ func RemoteGet(url string) (msg *RetMsg, err error) {
 	}
 
 	err = json.Unmarshal([]byte(body), &msg)
-
 	if err != nil {
 		return nil, err
 	}

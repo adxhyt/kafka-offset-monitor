@@ -12,6 +12,7 @@ type Config struct {
 	ZkPath     string        `json:"zk_path"`
 	ZkCluster  string        `json:"zk_cluster"`
 	Interval   int           `json:"interval"`
+	Sleep      int           `json:"sleep"`
 	Distance   int           `json:"distance_threshold"`
 	Passby     []Clusterlist `json:"pass_by"`
 }
