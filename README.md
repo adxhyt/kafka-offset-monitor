@@ -12,5 +12,5 @@ start: ./kafka-offset-monitor -c config.json -sw=1
     -c=<file>
         config.json; read config
 
-Tips: should work with https://github.com/crask/kafka-pusher
+Tips: should work with https://github.com/crask/kafka-pusher. forked from https://github.com/crask/kafka-pusher
 
