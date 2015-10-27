@@ -45,6 +45,7 @@ func main() {
 	// init
 	manager := NewManager(monitor_file, logger_file, logger_switch)
 	manager.Init(config)
+	defer manager.Close()
 
 	for {
 		select {
@@ -54,5 +55,4 @@ func main() {
 			go manager.Work()
 		}
 	}
-	manager.Close()
 }
