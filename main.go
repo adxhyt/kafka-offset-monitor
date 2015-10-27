@@ -40,7 +40,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("[OFFSET MON]Load Config err: %s", err)
 	}
-	t := time.NewTicker(time.Duration(config.Interval) * time.Second)
+	ticker := time.NewTicker(time.Duration(config.Interval) * time.Second)
+	defer ticker.Stop()
 
 	// init
 	manager := NewManager(monitor_file, logger_file, logger_switch)
@@ -49,7 +50,7 @@ func main() {
 
 	for {
 		select {
-		case <-t.C:
+		case <-ticker.C:
 			r := rand.Intn(config.Sleep)
 			time.Sleep(time.Duration(r))
 			go manager.Work()
