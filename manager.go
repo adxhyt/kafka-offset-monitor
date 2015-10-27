@@ -63,8 +63,6 @@ func (this *Manager) Work() error {
 		passBy[value.Cluster] = item
 	}
 
-	defer this.Close()
-
 	var data []LogData
 	for _, worker := range this.Workers {
 		kafkaOffset, err := worker.GetLastOffset()

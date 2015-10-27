@@ -54,4 +54,5 @@ func main() {
 			go manager.Work()
 		}
 	}
+	manager.Close()
 }
