@@ -2,7 +2,7 @@
 
 start: ./kafka-offset-monitor -c config.json -sw=1 
 
-    // Kafka pusher params
+    // Kafka offset monitor params
     -f=<path>
         the monitor log path; default value:/home/work/kafka-monitor/log/kafka_offset_monitor
     -l=<path>
