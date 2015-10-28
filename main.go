@@ -45,7 +45,10 @@ func main() {
 
 	// init
 	manager := NewManager(monitor_file, logger_file, logger_switch)
-	manager.Init(config)
+	err = manager.Init(config)
+	if err != nil {
+		log.Fatalf("[OFFSET MON]Init Manager err: %s", err)
+	}
 	defer manager.Close()
 
 	for {
