@@ -55,7 +55,7 @@ func main() {
 		select {
 		case <-ticker.C:
 			r := rand.Intn(config.Sleep)
-			time.Sleep(time.Duration(r))
+			time.Sleep(time.Duration(r) * time.Second)
 			go manager.Work()
 		}
 	}
