@@ -7,6 +7,8 @@ start: ./kafka-offset-monitor -c config.json -sw=1
         the monitor log path; default value:/home/work/kafka-monitor/log/kafka_offset_monitor
     -l=<path>
         the runtime logger path; record runtime data; default value:/home/work/kafka-monitor/log/kafka_offset_logger
+    -err=<path>
+        the error logger path; record error data; default value:/home/work/kafka-monitor/log/kafka_offset_err; default open
     -sw <runtime logger switcher>
         0 means close; 1 means open; default close
     -c=<file>
