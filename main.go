@@ -9,11 +9,10 @@ import (
 
 var (
 	configFile, monitor_file, logger_file, err_file string
-	logger_switch                                   int
+	logger_switch, http_time_out                    int
 	ZABBIX_KEY_LASTEST_OFFSET                       = "latest_offset"
 	ZABBIX_KEY_DISTANCE                             = "distance"
 	INT64_MAX                                       = 9223372036854775807
-	HTTP_TIME_OUT                                   = 5
 )
 
 type LogData struct {
@@ -33,6 +32,7 @@ func init() {
 	flag.StringVar(&logger_file, "l", "/home/work/kafka-monitor/log/kafka_offset_logger", "the runtime logger path")
 	flag.StringVar(&err_file, "err", "/home/work/kafka-monitor/log/kafka_offset_err", "the error logger path")
 	flag.IntVar(&logger_switch, "sw", 0, "the logger switcher")
+	flag.IntVar(&http_time_out, "timeout", 3, "http default time out")
 }
 
 func main() {

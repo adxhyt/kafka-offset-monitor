@@ -30,7 +30,7 @@ func NewPusherGeter(url string, errfile string) *PusherGeter {
 }
 
 func (this *PusherGeter) RemoteGet() (msg *RetMsg, err error) {
-	timeout := time.Duration(3 * time.Second)
+	timeout := time.Duration(http_time_out) * time.Second
 	client := http.Client{
 		Timeout: timeout,
 	}
