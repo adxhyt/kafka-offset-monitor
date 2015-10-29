@@ -15,14 +15,15 @@ type Manager struct {
 
 	Logger_file   string
 	Monitor_file  string
+	Err_file      string
 	Logger_switch int
 
 	Distance int
 	Passby   []Clusterlist
 }
 
-func NewManager(monitor string, logger string, switcher int) *Manager {
-	return &Manager{Monitor_file: monitor, Logger_file: logger, Logger_switch: switcher}
+func NewManager(monitor string, logger string, switcher int, errfile string) *Manager {
+	return &Manager{Monitor_file: monitor, Logger_file: logger, Logger_switch: switcher, Err_file: errfile}
 }
 
 func (this *Manager) Init(config *Config) error {
@@ -33,15 +34,16 @@ func (this *Manager) Init(config *Config) error {
 	this.Passby = config.Passby
 
 	for _, zookeeper := range this.Zookeepers {
-		worker := NewOffsetWorker(zookeeper, this.ZkCluster)
+		worker := NewOffsetWorker(zookeeper, this.ZkCluster, this.Err_file)
 		err := worker.Init()
 		if err != nil {
+			AddLogger(this.Err_file, "[Distance Err MAN_INIT_ERR]", err)
 			return err
 		}
 		this.Workers = append(this.Workers, worker)
 	}
 
-	this.PusherGeter = NewPusherGeter(config.Url)
+	this.PusherGeter = NewPusherGeter(config.Url, this.Err_file)
 	return nil
 }
 
@@ -52,6 +54,8 @@ func (this *Manager) Work() error {
 	// get data from pusher
 	var msg *RetMsg
 	if msg, err = this.PusherGeter.RemoteGet(); err != nil {
+		// add log record time_out
+		AddLogger(this.Err_file, "[Distance Err PUSHER_GETER_ERR]", err)
 		return err
 	}
 
@@ -67,6 +71,7 @@ func (this *Manager) Work() error {
 	for _, worker := range this.Workers {
 		kafkaOffset, err := worker.GetLastOffset()
 		if nil != err {
+			AddLogger(this.Err_file, "[Distance Err MAN_WORKER_ERR]", err)
 			return err
 		}
 
@@ -173,4 +178,12 @@ func getGroupNameByUrl(url string) string {
 	m.Write([]byte(url))
 	s := hex.EncodeToString(m.Sum(nil))
 	return s
+}
+
+func AddLogger(logger_path string, err_type string, err error) {
+	msgLog := []string{}
+	s := fmt.Sprintf("%v, %v", err_type, err)
+	msgLog = append(msgLog, s)
+	logger := NewFileLogger(logger_path, msgLog)
+	logger.RecordLogger()
 }

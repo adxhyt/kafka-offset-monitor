@@ -8,11 +8,12 @@ import (
 )
 
 var (
-	configFile, monitor_file, logger_file string
-	logger_switch                         int
-	ZABBIX_KEY_LASTEST_OFFSET             = "latest_offset"
-	ZABBIX_KEY_DISTANCE                   = "distance"
-	INT64_MAX                             = 9223372036854775807
+	configFile, monitor_file, logger_file, err_file string
+	logger_switch                                   int
+	ZABBIX_KEY_LASTEST_OFFSET                       = "latest_offset"
+	ZABBIX_KEY_DISTANCE                             = "distance"
+	INT64_MAX                                       = 9223372036854775807
+	HTTP_TIME_OUT                                   = 5
 )
 
 type LogData struct {
@@ -30,6 +31,7 @@ func init() {
 	flag.StringVar(&configFile, "c", "config.json", "the config file")
 	flag.StringVar(&monitor_file, "f", "/home/work/kafka-monitor/log/kafka_offset_monitor", "the log path")
 	flag.StringVar(&logger_file, "l", "/home/work/kafka-monitor/log/kafka_offset_logger", "the runtime logger path")
+	flag.StringVar(&err_file, "err", "/home/work/kafka-monitor/log/kafka_offset_err", "the error logger path")
 	flag.IntVar(&logger_switch, "sw", 0, "the logger switcher")
 }
 
@@ -44,7 +46,7 @@ func main() {
 	defer ticker.Stop()
 
 	// init
-	manager := NewManager(monitor_file, logger_file, logger_switch)
+	manager := NewManager(monitor_file, logger_file, logger_switch, err_file)
 	err = manager.Init(config)
 	if err != nil {
 		log.Fatalf("[OFFSET MON]Init Manager err: %s", err)
