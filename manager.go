@@ -8,10 +8,10 @@ import (
 )
 
 type Manager struct {
-	Workers     []*OffsetWorker
-	PusherGeter *PusherGeter
-	Zookeepers  []string
-	ZkCluster   string
+	Worker       *OffsetWorker
+	PusherGeters []*PusherGeter
+	Zookeepers   []string
+	ZkCluster    string
 
 	Logger_file   string
 	Monitor_file  string
@@ -33,17 +33,17 @@ func (this *Manager) Init(config *Config) error {
 	this.Distance = config.Distance
 	this.Passby = config.Passby
 
-	for _, zookeeper := range this.Zookeepers {
-		worker := NewOffsetWorker(zookeeper, this.ZkCluster, this.Err_file)
-		err := worker.Init()
-		if err != nil {
-			AddLogger(this.Err_file, "[Distance Err MAN_INIT_ERR]", err)
-			return err
-		}
-		this.Workers = append(this.Workers, worker)
+	this.Worker = NewOffsetWorker(this.Zookeepers[0], this.ZkCluster, this.Err_file)
+	err := this.Worker.Init()
+	if err != nil {
+		AddLogger(this.Err_file, "[Distance Err MAN_INIT_ERR]", err)
+		return err
 	}
 
-	this.PusherGeter = NewPusherGeter(config.Url, this.Err_file)
+	for _, urlList := range config.Urls {
+		pusher := NewPusherGeter(urlList, this.Err_file)
+		this.PusherGeters = append(this.PusherGeters, pusher)
+	}
 	return nil
 }
 
@@ -51,13 +51,7 @@ func (this *Manager) Work() error {
 	// kafka get data from brokerList
 	host, err := os.Hostname()
 
-	// get data from pusher
-	var msg *RetMsg
-	if msg, err = this.PusherGeter.RemoteGet(); err != nil {
-		// add log record time_out
-		AddLogger(this.Err_file, "[Distance Err PUSHER_GETER_ERR]", err)
-		return err
-	}
+	pusherData, err := this.AssemblePusherData()
 
 	// pass_by
 	passBy := map[string]map[string]string{}
@@ -68,91 +62,65 @@ func (this *Manager) Work() error {
 	}
 
 	var data []LogData
-	for _, worker := range this.Workers {
-		kafkaOffset, err := worker.GetLastOffset()
-		if nil != err {
-			AddLogger(this.Err_file, "[Distance Err MAN_WORKER_ERR]", err)
-			return err
-		}
+	kafkaOffset, err := this.Worker.GetLastOffset()
+	if nil != err {
+		AddLogger(this.Err_file, "[Distance Err MAN_WORKER_ERR]", err)
+		return err
+	}
 
-		topicKeyList := []string{}
-		for topicKey, v := range kafkaOffset {
-			topicKeyList = append(topicKeyList, topicKey)
-			data = append(data, LogData{
-				Host:          host,
-				Zabbix_key:    ZABBIX_KEY_LASTEST_OFFSET,
-				Cluster:       this.ZkCluster,
-				ConsumerGroup: "na",
-				Url:           "na",
-				Topic:         topicKey,
-				Threshold:     INT64_MAX,
-				Distance:      v["total"],
-			})
-		}
+	topicKeyList := []string{}
+	for topicKey, v := range kafkaOffset {
+		topicKeyList = append(topicKeyList, topicKey)
+		data = append(data, LogData{
+			Host:          host,
+			Zabbix_key:    ZABBIX_KEY_LASTEST_OFFSET,
+			Cluster:       this.ZkCluster,
+			ConsumerGroup: "na",
+			Url:           "na",
+			Topic:         topicKey,
+			Threshold:     INT64_MAX,
+			Distance:      v["total"],
+		})
+	}
 
-		newResp := []ClientResp{}
-		for _, v := range msg.Data {
-			// pass_by filter
-			temp, ok := passBy[this.ZkCluster][getGroupNameByUrl(v.Url)]
-			if ok && temp == v.Topic {
-				continue
+	if pusherData != nil {
+		msgLog := []string{}
+		distanceData := map[string]map[string]int64{}
+		for consumergroup, group := range pusherData {
+			cgItem := map[string]int64{}
+			for topic, topicData := range group {
+				// pass_by filter
+				passbytopic, ok := passBy[this.ZkCluster][getGroupNameByUrl(consumergroup)]
+				if ok && passbytopic == topic {
+					continue
+				}
+				for partition, offset := range topicData {
+					value, ok := kafkaOffset[topic][partition]
+					if ok && offset >= 0 {
+						offset = value - offset
+						cgItem[topic] += offset
+
+						s := fmt.Sprintf("[Distance Data] topic:%v cg:%v url:%v partition:%v distance:%d", topic, getGroupNameByUrl(consumergroup), consumergroup, partition, offset)
+						msgLog = append(msgLog, s)
+					}
+				}
 			}
-			value, ok := kafkaOffset[v.Topic][fmt.Sprintf("%d", v.Partition)]
-			if ok {
-				v.Offset = value - v.Offset
-				newResp = append(newResp, ClientResp{
-					Topic:     v.Topic,
-					Partition: v.Partition,
-					Offset:    v.Offset, // already distance
-					Url:       v.Url,
-				})
-			}
+			distanceData[consumergroup] = cgItem
 		}
 
 		if this.Logger_switch == 1 {
-			msgLog := []string{}
-			for _, v := range newResp {
-				s := fmt.Sprintf("[Distance Data] topic:%s cg:%s url:%s partition:%d distance:%d", v.Topic, getGroupNameByUrl(v.Url), v.Url, v.Partition, v.Offset)
-				msgLog = append(msgLog, s)
-			}
 			logger := NewFileLogger(this.Logger_file, msgLog)
 			logger.RecordLogger()
 		}
-		//change []slice => map
-		pusherDataMap := map[string]map[string]map[int32]int64{}
-		for _, group := range newResp {
-			g, ok := pusherDataMap[group.Url]
-			if !ok {
-				g = make(map[string]map[int32]int64)
-				pusherDataMap[group.Url] = g
-			}
-			t, ok := g[group.Topic]
-			if !ok {
-				t = make(map[int32]int64)
-				g[group.Topic] = t
-			}
-			t[group.Partition] = group.Offset
-		}
 
-		distanceData := map[string]map[string]int64{}
-		for cg, cgData := range pusherDataMap {
-			cgItem := map[string]int64{}
-			for topic, topicData := range cgData {
-				for _, offset := range topicData {
-					cgItem[topic] += offset
-				}
-			}
-			distanceData[cg] = cgItem
-		}
-
-		for cg, cgData := range distanceData {
+		for consumergroup, cgData := range distanceData {
 			for topic, distance := range cgData {
 				data = append(data, LogData{
 					Host:          host,
 					Zabbix_key:    ZABBIX_KEY_DISTANCE,
 					Cluster:       this.ZkCluster,
-					ConsumerGroup: getGroupNameByUrl(cg),
-					Url:           cg,
+					ConsumerGroup: getGroupNameByUrl(consumergroup),
+					Url:           consumergroup,
 					Topic:         topic,
 					Threshold:     this.Distance,
 					Distance:      distance,
@@ -160,17 +128,47 @@ func (this *Manager) Work() error {
 			}
 		}
 	}
-
 	writer := NewFileWriter(this.Monitor_file, data)
 	writer.WriteToFile()
 
 	return nil
 }
 
-func (this *Manager) Close() {
-	for _, worker := range this.Workers {
-		worker.Close()
+func (this *Manager) AssemblePusherData() (pusherDataMap map[string]map[string]map[string]int64, err error) {
+	var dataList, data []*ClientResp
+	for _, pusher := range this.PusherGeters {
+		if data, err = pusher.RemoteGet(); err != nil {
+			return nil, err
+		}
+		dataList = append(dataList, data...)
 	}
+
+	pusherDataMap = map[string]map[string]map[string]int64{}
+	for _, item := range dataList {
+		g, ok := pusherDataMap[item.Url]
+		if !ok {
+			g = map[string]map[string]int64{}
+			pusherDataMap[item.Url] = g
+		}
+		t, ok := g[item.Topic]
+		if !ok {
+			t = map[string]int64{}
+			g[item.Topic] = t
+		}
+		value, ok := t[fmt.Sprintf("%d", item.Partition)]
+		if !ok {
+			t[fmt.Sprintf("%d", item.Partition)] = item.Offset
+		} else {
+			if item.Offset > value {
+				t[fmt.Sprintf("%d", item.Partition)] = item.Offset
+			}
+		}
+	}
+	return pusherDataMap, nil
+}
+
+func (this *Manager) Close() {
+	this.Worker.Close()
 }
 
 func getGroupNameByUrl(url string) string {

@@ -1,5 +1,9 @@
 {
-    "url": "http://localhost:8555/stat/worker",
+    "url": [
+		"http://localhost:8555/stat/worker",
+		"http://localhost:8556/stat/worker",
+		"http://localhost:8557/stat/worker"
+	],
     "zookeepers": [
         "127.0.0.1:2181/kafka/cart"
     ],

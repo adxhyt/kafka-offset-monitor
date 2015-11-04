@@ -15,3 +15,9 @@ var ErrPusherTimeOut = errors.New("pusher http response: fetch kafka-pusher remo
 var ErrPusherReadErr = errors.New("pusher http response: fetch kafka-pusher data read response err")
 
 var ErrPusherJsonErr = errors.New("pusher http response: fetch kafka-pusher data json unmarshal err")
+
+var ErrPusherDataErr = errors.New("pusher http response: fetch kafka-pusher data is empty with 400 http code")
+
+var ErrPusherEmptyData = errors.New("pusher http response: fetch kafka-pusher data is empty with 200 http code")
+
+var ErrTrackerServiceSuspend = errors.New("pusher http response: service suspend. tracker data unchanged for 1 hour")

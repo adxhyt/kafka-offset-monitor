@@ -7,7 +7,7 @@ import (
 )
 
 type Config struct {
-	Url        string        `json:"url"`
+	Urls       []string      `json:"url"`
 	Zookeepers []string      `json:"zookeepers"`
 	ZkPath     string        `json:"zk_path"`
 	ZkCluster  string        `json:"zk_cluster"`
