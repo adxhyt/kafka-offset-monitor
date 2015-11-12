@@ -54,12 +54,7 @@ func (this *Manager) Work() error {
 	pusherData, medianVector, err := this.AssemblePusherData()
 
 	// pass_by
-	passBy := map[string]map[string]string{}
-	for _, value := range this.Passby {
-		item := map[string]string{}
-		item[value.ConsumerGroup] = value.Topic
-		passBy[value.Cluster] = item
-	}
+	passBy := this.GetPassbyFilter()
 
 	var data []LogData
 	kafkaOffset, err := this.Worker.GetLastOffset()
@@ -90,8 +85,8 @@ func (this *Manager) Work() error {
 			cgItem := map[string]int64{}
 			for topic, topicData := range group {
 				// pass_by filter
-				passbytopic, ok := passBy[this.ZkCluster][getGroupNameByUrl(consumergroup)]
-				if ok && passbytopic == topic {
+				passbyValue, ok := passBy[this.ZkCluster][getGroupNameByUrl(consumergroup)][topic]
+				if ok && passbyValue == 1 {
 					continue
 				}
 				for partition, offset := range topicData {
@@ -184,6 +179,27 @@ func (this *Manager) AssemblePusherData() (pusherDataMap map[string]map[string]m
 	}
 
 	return pusherDataMap, medianVector, nil
+}
+
+func (this *Manager) GetPassbyFilter() map[string]map[string]map[string]int {
+	passBy := map[string]map[string]map[string]int{}
+	for _, value := range this.Passby {
+		g, ok := passBy[value.Cluster]
+		if !ok {
+			g = map[string]map[string]int{}
+			passBy[value.Cluster] = g
+		}
+		t, ok := g[value.ConsumerGroup]
+		if !ok {
+			t = map[string]int{}
+			g[value.ConsumerGroup] = t
+		}
+		value, ok := t[value.Topic]
+		if !ok {
+			t[value.Topic] = 1
+		}
+	}
+	return passBy
 }
 
 func (this *Manager) Close() {
