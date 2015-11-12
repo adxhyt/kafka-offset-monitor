@@ -96,10 +96,11 @@ func (this *Manager) Work() error {
 						cgItem[topic] += temp
 
 						median, exist := medianVector[consumergroup][topic]
+						s := ""
 						if exist {
-							s := fmt.Sprintf("[Distance Data] topic:%v cg:%v url:%v partition:%v distance:%d offset:%d median:%d", topic, getGroupNameByUrl(consumergroup), consumergroup, partition, temp, offset, median)
+							s = fmt.Sprintf("[Distance Data] topic:%v cg:%v url:%v partition:%v distance:%d offset:%d median:%d", topic, getGroupNameByUrl(consumergroup), consumergroup, partition, temp, offset, median)
 						} else {
-							s := fmt.Sprintf("[Distance Data] topic:%v cg:%v url:%v partition:%v distance:%d offset:%d", topic, getGroupNameByUrl(consumergroup), consumergroup, partition, temp, offset)
+							s = fmt.Sprintf("[Distance Data] topic:%v cg:%v url:%v partition:%v distance:%d offset:%d", topic, getGroupNameByUrl(consumergroup), consumergroup, partition, temp, offset)
 						}
 						msgLog = append(msgLog, s)
 					}
@@ -194,7 +195,7 @@ func (this *Manager) GetPassbyFilter() map[string]map[string]map[string]int {
 			t = map[string]int{}
 			g[value.ConsumerGroup] = t
 		}
-		value, ok := t[value.Topic]
+		_, ok = t[value.Topic]
 		if !ok {
 			t[value.Topic] = 1
 		}
