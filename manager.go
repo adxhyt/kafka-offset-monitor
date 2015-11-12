@@ -51,7 +51,7 @@ func (this *Manager) Work() error {
 	// kafka get data from brokerList
 	host, err := os.Hostname()
 
-	pusherData, err := this.AssemblePusherData()
+	pusherData, medianVector, err := this.AssemblePusherData()
 
 	// pass_by
 	passBy := map[string]map[string]string{}
@@ -97,10 +97,15 @@ func (this *Manager) Work() error {
 				for partition, offset := range topicData {
 					value, ok := kafkaOffset[topic][partition]
 					if ok && offset >= 0 {
-						offset = value - offset
-						cgItem[topic] += offset
+						temp := value - offset
+						cgItem[topic] += temp
 
-						s := fmt.Sprintf("[Distance Data] topic:%v cg:%v url:%v partition:%v distance:%d", topic, getGroupNameByUrl(consumergroup), consumergroup, partition, offset)
+						median, exist := medianVector[consumergroup][topic]
+						if exist {
+							s := fmt.Sprintf("[Distance Data] topic:%v cg:%v url:%v partition:%v distance:%d offset:%d median:%d", topic, getGroupNameByUrl(consumergroup), consumergroup, partition, temp, offset, median)
+						} else {
+							s := fmt.Sprintf("[Distance Data] topic:%v cg:%v url:%v partition:%v distance:%d offset:%d", topic, getGroupNameByUrl(consumergroup), consumergroup, partition, temp, offset)
+						}
 						msgLog = append(msgLog, s)
 					}
 				}
@@ -134,11 +139,11 @@ func (this *Manager) Work() error {
 	return nil
 }
 
-func (this *Manager) AssemblePusherData() (pusherDataMap map[string]map[string]map[string]int64, err error) {
+func (this *Manager) AssemblePusherData() (pusherDataMap map[string]map[string]map[string]int64, medianVector map[string]map[string]int64, err error) {
 	var dataList, data []*ClientResp
 	for _, pusher := range this.PusherGeters {
 		if data, err = pusher.RemoteGet(); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		dataList = append(dataList, data...)
 	}
@@ -164,7 +169,21 @@ func (this *Manager) AssemblePusherData() (pusherDataMap map[string]map[string]m
 			}
 		}
 	}
-	return pusherDataMap, nil
+
+	medianVector = map[string]map[string]int64{}
+	for cg, cgData := range pusherDataMap {
+		dataSlice := map[string]int64{}
+		for topic, topicData := range cgData {
+			dataMap := []int64{}
+			for _, offset := range topicData {
+				dataMap = append(dataMap, offset)
+			}
+			dataSlice[topic] = Median(dataMap)
+		}
+		medianVector[cg] = dataSlice
+	}
+
+	return pusherDataMap, medianVector, nil
 }
 
 func (this *Manager) Close() {
