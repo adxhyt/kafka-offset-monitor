@@ -98,7 +98,12 @@ func (this *Manager) Work() error {
 						median, exist := medianVector[consumergroup][topic]
 						s := ""
 						if exist {
-							s = fmt.Sprintf("[Distance Data] topic:%v cg:%v url:%v partition:%v distance:%d offset:%d median:%d", topic, getGroupNameByUrl(consumergroup), consumergroup, partition, temp, offset, median)
+							percent := float64(Abs(offset-median) / median)
+							status := "OK"
+							if percent > 0.3 {
+								status = "WARNING"
+							}
+							s = fmt.Sprintf("[Distance Data] topic:%v cg:%v url:%v partition:%v distance:%d offset:%d median:%d status:%v", topic, getGroupNameByUrl(consumergroup), consumergroup, partition, temp, offset, median, status)
 						} else {
 							s = fmt.Sprintf("[Distance Data] topic:%v cg:%v url:%v partition:%v distance:%d offset:%d", topic, getGroupNameByUrl(consumergroup), consumergroup, partition, temp, offset)
 						}
